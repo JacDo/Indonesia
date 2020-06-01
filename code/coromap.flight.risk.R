@@ -1,6 +1,6 @@
 ########### set-up######################
 
- setwd("C:/Users/seufe/bla Dropbox/Jacqueline Seufert/Unterlagen_Jacqueline/data/tmp")
+setwd("C:/Users/seufe/bla Dropbox/Jacqueline Seufert/Unterlagen_Jacqueline/data/tmp")
 
 ####### libraries###########
 
@@ -57,9 +57,7 @@ names(indonesia)[4:7] <- c(
 
 #idea: take the importation risk at departure airports, 
 #spread risk through the network 
-#sum up by arrival airports
-# thereby the risk at the original departure airports might be changed
-# as they experience additional exposure within domestic airtraffic
+#sum up by ceparture airports
 
 
 indonesia <- indonesia %>%
@@ -264,7 +262,7 @@ result <- result %>% mutate(exp_risk = exp(risk) + 0.5 * model$sig2+
                               ifelse(is.na(weight_arr), 0, weight_arr))
 
 final <- result %>%
-  group_by(arrival.iata) %>%
+  group_by(departure.iata) %>%
   summarise(sum_risk = sum(exp_risk)) # sum the proportional risks for every
 # arrival airport
 
@@ -278,7 +276,8 @@ final <- final %>%
     risk_index = (sum_risk - min) / (max - min)
   )
 
-ggplot(final, aes(reorder(arrival.iata, -risk_index), risk_index)) +
+write.csv(final, "flight_risk.csv")
+ggplot(final, aes(reorder(departure.iata, -risk_index), risk_index)) +
   geom_col() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 5)) +
   xlab("Airports") +
