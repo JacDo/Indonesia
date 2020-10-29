@@ -14,7 +14,17 @@ flist<-c(
   file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/admin_borders/world/world001.shp"),
   file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/admin_borders/world/world001.shx"),
   file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/PODES/PODES_2014/podes2014.Rds"),
-  file.path("/Users/eliascis/Dropbox/kairos/research_projects/fretpol/data/store/fretpol.data.tbase.Rds")
+  file.path("/Users/eliascis/Dropbox/kairos/research_projects/fretpol/data/store/fretpol.data.tbase.Rds"),
+  file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/nightlight/DMSP-OLS/F182013.tif"), 
+  file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/PODES/PODES_2014/podes2014layer.shx"), 
+  file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/PODES/PODES_2014/podes2014layer.shp"), 
+  file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/PODES/PODES_2014/podes2014layer.prj"), 
+  file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/PODES/PODES_2014/podes2014layer.dbf"), 
+  file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/PODES/PODES_2014/podes2014layer.Rds"), 
+  file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/PODES/PODES_2011/podes2011.Rds"), 
+  file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/admin_borders/indonesia/villages-merging/podes2011-2-podes2014.csv"), 
+  file.path("/Users/eliascis/Dropbox/kairos/research_supplements/database/admin_borders/indonesia/kabkot/kabkot.identifiers.Rds")#, 
+  # file.path("podes\ 2011\ -\ Village\ (en).pdf")
 )
 flink<-tempfile()
 cat(flist,file=flink,sep="\n")

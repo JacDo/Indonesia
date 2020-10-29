@@ -1,0 +1,77 @@
+############################################
+######### INLA #############################
+############################################
+
+##### setup ################################
+library(sp)
+library(rgdal)
+library(raster)
+library(tidyverse)
+library(INLA)
+library(ggthemes)
+library(furrr)
+library(scales)
+library(spdep)
+library(furrr)
+
+##### load data ############################
+setwd("/home/cloud/data")
+load("input.Rds")
+
+spde <- inla.spde2.matern(mesh = mesh, alpha = 2, constr = TRUE)
+indexs <- inla.spde.make.index("s", spde$n.spde)
+
+validation_method <- function(spde, indexs, mesh, point, coo, i){
+train <- point[-i, ]
+test <- point[i, ]
+test$positive <- NA  
+train_coords <- coo[-i,]
+test_coords <- coo[i,]
+Ae<-inla.spde.make.A(mesh=mesh,loc=train_coords)
+test_coords<-as.matrix(test_coords)
+dim(test_coords) <- c(1,2)
+Ap <- inla.spde.make.A(mesh = mesh, loc = test_coords)
+stk.e <- inla.stack(data=list(y=train$risk), 
+                    A=list(Ae,1),  
+                    effects=list(c(list(b0=1)
+                                   ,indexs),
+                                 list(travel = train$travel,
+                                      night = train$nightlight,
+                                      pop = train$population)
+                    ), 
+                    tag='est')
+
+stk.p <- inla.stack(data=list(y=test$risk), 
+                    A=list(Ap,1),  
+                    effects=list(c(list(b0=1)
+                                   ,indexs),
+                                 list(travel = train$travel,
+                                      night = train$nightlight,
+                                      pop = train$population)
+                    ), 
+                    tag='pred')
+#put them together
+stk.full <- inla.stack(stk.e, stk.p)
+}
+mod.mode <- inla(formula,
+                 data = inla.stack.data(stk.e, spde = spde),
+                 control.predictor = list(
+                     A = inla.stack.A(stk.e),
+                     compute = FALSE
+                 ),
+                 control.compute = list(cpo = T, dic = T, waic = T),
+                verbose =T)
+#getting the predictions
+index.pred <- inla.stack.index(stk.full, "pred")$data
+post.mean <- mod.mode$summary.fitted.values[index.pred,'mean']
+post.0025 <- mod.mode$summary.fitted.values[index.pred,'0.025quant']
+post.0975 <- mod.mode$summary.fitted.values[index.pred,'0.975quant']
+result <- data.frame(mean = post.mean, q0025= post.0025, q0975 = post.0975)
+return(result)
+}
+plan(multisession)
+validation_summary <- future_map(c(1:2), ~validation_method(spde=spde,
+                                                           indexs=indexs, 
+                                                           mesh=mesh, 
+                                                           point=point, 
+                                                           coo= coo, i=.x))
