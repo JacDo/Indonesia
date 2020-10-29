@@ -174,7 +174,6 @@ plot(gD,
 
 ##### vertex measures ##########################################################
 V(gD)$transitivity <- transitivity(gD, type = "local", isolates = "zero")
-page_rank <- page.rank(gD)$vector
 V(gD)$in_strength <- igraph::strength(gD, mode = "in")
 V(gD)$out_strength <- igraph::strength(gD, mode = "out")
 
@@ -183,7 +182,6 @@ input <- data.frame(
   bet = betweenness(gD),
   eig = evcent(gD, directed = T)$vector,
   trans = V(gD)$transitivity,
-  page = page_rank,
   in_strength = V(gD)$in_strength,
   out_strength = V(gD)$out_strength
 )
@@ -287,7 +285,7 @@ check(gam_diag,
 test_data <- test %>%
   ungroup() %>%
   dplyr::select(
-    bet, eig, trans, page, in_strength, out_strength, n, dis, sim, con, bw,
+    bet, eig, trans, in_strength, out_strength, n, dis, sim, con, bw,
     proportion_departure, distance_geo, weight_arr
   )
 
