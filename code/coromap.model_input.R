@@ -108,7 +108,11 @@ mesh_plot <- ggplot(point) +
   coord_fixed() +
   theme_map() +
   labs(color = "Risk") +
-  ggtitle(paste("Vertices: ", mesh$n))
+  ggtitle(paste("Vertices: ", mesh$n)) +
+  ggsave("tmp/coromap_mesh.pdf",
+    width = 1920 / 72 / 3, height = 1080 / 72 / 3,
+    dpi = 72, limitsize = F
+  )
 ##### INLA prep ################################################################
 ratio <- 1 / 100
 # % of maximal distance within the area that
@@ -130,14 +134,20 @@ coop <- dp[, c("x", "y")]
 Ap <- inla.spde.make.A(mesh = mesh, loc = coop)
 save.image("tmp/input.Rds")
 ##### covariate plot ###########################################################
+pdf(
+  file = "tmp/coromap_covariates.pdf",
+  width = 8,
+  height = 4
+)
 levelplot(raster[[1:3]],
   xlab = "", ylab = "",
   names.attr = c(
-    "Distance to nearest airport",
-    "Traffic Density", "Distance to Java and Bali"
+    "(a)",
+    "(b)", "(c)"
   ),
-  par.strip.text = list(cex = 0.7, lines = 2, fontface = "bold")
+  par.strip.text = list(cex = 1.5, lines = 2, fontface = "bold")
 )
+dev.off()
 ##### airport plot #############################################################
 geo <- read.csv("tmp/domestic_air.csv")
 input_shape <- st_read("tmp/dissolve.shp")
@@ -146,8 +156,8 @@ ggplot() +
   geom_sf(data = input_shape, fill = "bisque") +
   geom_label_repel(
     data = geo, aes(x = longitude, y = latitude, label = iata),
-    size = 3.4, label.size = 0.1, hjust = 0.3, nudge_x = 0.01,
-    color = "black"
+    size = 15, label.size = 0.01, hjust = 0.3, nudge_x = 0.01,
+    color = "darkgreen", segment.colour = "red"
   ) +
   theme(
     panel.background = element_rect(
@@ -157,4 +167,7 @@ ggplot() +
     )
   ) +
   xlab("") +
-  ylab("")
+  ylab("") +
+  ggsave("tmp/coromap_airports.pdf",
+    width = 1920 / 72, height = 1080 / 72, dpi = 72, limitsize = F
+  )

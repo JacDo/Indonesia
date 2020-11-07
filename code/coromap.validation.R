@@ -27,7 +27,7 @@ point_input$risk <- rescale(point_input$risk, c(0.01, 0.99))
 # @point_input observations
 # @coo prediction covariates
 # @i index of airport
-# 
+#
 validation_method <- function(spde, indexs, mesh, point_input, coo, i) {
   train <- point_input[-i, ]
   test <- point_input[i, ]
@@ -133,6 +133,9 @@ ggplot(validation_new, aes(x = index, y = mean, color = "Prediction")) +
   ) +
   ylab("Mean") +
   xlab("Index") +
-  labs(color = "Colour")
-ggtitle("Prediction vs true value") 
+  labs(color = "Colour") +
+  ggsave("tmp/coromap_validation.pdf",
+    width = 1920 / 72 / 3, height = 1080 / 72 / 3,
+    dpi = 72, limitsize = F
+  )
 write.csv(validation_new, "tmp/validation.csv")

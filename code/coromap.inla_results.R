@@ -14,7 +14,7 @@ library(leaflet)
 library(raster)
 library(xtable)
 library(rlist)
-library(wesanderson)
+library(RColorBrewer)
 library(htmlwidgets)
 library(readxl)
 library(haven)
@@ -26,6 +26,21 @@ library(cowplot)
 setwd("C:/Users/seufe/Dropbox/Unterlagen_Jacqueline/data")
 load("tmp/inla.Rdata")
 source("C:/Users/seufe/Dropbox/Unterlagen_Jacqueline/code/inla_function.R")
+
+###### spatial field ###########################################################
+A1.grid <- inla.mesh.projector(mesh, dims = c(100, 1000))
+eta.spde <- inla.mesh.project(A1.grid, res$summary.random$s) %>%
+  as.matrix() %>%
+  as.data.frame() %>%
+  bind_cols(
+    expand.grid(x = A1.grid$x, y = A1.grid$y)
+  ) %>%
+  filter(!is.na(ID))
+shape <- st_read("external/kap2015idm.corrected.shp")
+ggplot() +
+  geom_tile(data = eta.spde, aes(x = x, y = y, fill = )) +
+  geom_sf(data = shape, fill = NA) +
+  scale_fill_gradient2()
 
 ###### model selection #########################################################
 result <- data.frame(result) %>%
@@ -50,8 +65,19 @@ ggplot(data.frame(
   geom_point(aes(x, y)) +
   geom_abline(intercept = 0, slope = 1) +
   xlab("Theoretical Quantiles") +
-  ylab("Sample Quantiles")
-
+  ylab("Sample Quantiles") +
+  ggsave("tmp/coromap_qqplot.pdf",
+    width = 1920 / 72 / 3, height = 1080 / 72 / 3,
+    dpi = 72, limitsize = F
+  )
+##### diagnostics ##############################################################
+pdf(
+  file = "tmp/coromap_diagnostics_inla.pdf",
+  width = 12,
+  height = 7
+)
+autoplot(res)
+dev.off()
 ##### transformation ###########################################################
 
 # optional: to obtain exact estimation, execute this code
@@ -78,15 +104,27 @@ sd <- (res$summary.fitted.values[index, "sd"])
 summary(res)
 inla.show.hyperspec(res)
 model0.res <- inla.spde2.result(res, "s", spde)
+kappa <- data.frame(inla.zmarginal(model0.res$marginals.kappa[[1]],
+  silent = T
+)[-c(4, 6)],
+mode =
+  inla.mmarginal(model0.res$marginals.kappa[[1]])
+)
+names(kappa) <- names(res$summary.fixed)[-c(7)]
+tau <- data.frame(inla.zmarginal(model0.res$marginals.tau[[1]],
+  silent = T
+)[-c(4, 6)],
+mode =
+  inla.mmarginal(model0.res$marginals.tau[[1]])
+)
+names(tau) <- names(res$summary.fixed)[-c(7)]
 list_of_dataframes <- list(
-  res$summary.fixed, res$summary.hyperpar,
-  exp(model0.res$summary.log.range.nominal),
-  exp(model0.res$summary.log.variance.nominal)
+  res$summary.fixed[, 1:6], res$summary.hyperpar,
+  kappa, tau
 ) %>%
   map(~ rownames_to_column(.x))
 
 output <- data.table::rbindlist(list_of_dataframes, fill = T)
-output <- output %>% dplyr::select(-c("kld", "ID"))
 print(xtable(output, type = "latex", digits = 3),
   file = "tmp/output_inla.tex"
 )
@@ -167,16 +205,21 @@ plotting <- function(name) {
 name_input <- names(df)[3:length(names(df))]
 plot_list <- lapply(name_input, plotting)
 
+pdf(
+  file = "tmp/result/coromap_overview.pdf",
+  width = 12,
+  height = 7
+)
 plot_grid(plot_list[[1]], plot_list[[2]],
-  plot_list[[3]], plot_list[[4]],
+  plot_list[[4]], plot_list[[3]],
   plot_list[[5]],
   labels = c(
-    "Mean", "Median", "97.5% Quantile",
-    "2.5% Quantile", "Standard deviation"
+    "Mean", "Median", "2.5% Quantile",
+    "97.5% Quantile", "Standard deviation"
   ),
-  label_size = 10, nrow = 3, vjust = 0.8, hjust = -0.2
+  label_size = 15, nrow = 3, vjust = 1.2, hjust = -0.2
 )
-
+dev.off()
 ##### exceedance probability ###################################################
 # exceedance: calculate exceedance probability
 # @exc the value to be exceeded
@@ -252,11 +295,13 @@ flight <- geo %>%
 plotting_exc <- function(exc_filter, exceedance, larger_than, opp = T) {
   option <- ifelse(opp == T, "viridis", "inferno")
   direction <- ifelse(opp == T, -1, 1)
+  fill <- ifelse(opp == T, "red", "green")
+  color <- ifelse(opp == T, "orange", "darkgreen")
   ggplot(data = exc_filter, aes(y = y, x = x)) +
     geom_raster(aes(fill = cond)) +
     geom_point(
-      data = flight, aes(y = y, x = x), color = "darkgreen", fill = "green",
-      size = 0.4, shape = 21, stroke = 0.3
+      data = flight, aes(y = y, x = x), color = color, fill = fill,
+      size = 1, shape = 21, stroke = 0.3
     ) +
     coord_equal() +
     scale_fill_viridis_c(
@@ -327,23 +372,29 @@ visualization <- pmap(
   list(vis_input$exc, vis_input$prob, vis_input$opp),
   ~ plot_exceedance(..1, ..2, ..3)
 )
+cairo_pdf(
+  filename = "tmp/coromap_exceedance1.pdf",
+  width = 15,
+  height = 7
+)
 plot_grid(
   plotlist = visualization, nrow = 2,
   labels = c(
     "P(log(risk)>-2.2)", paste(
       "P(log(risk)",
-      as.character(expression("\u2264")),
+      paste(intToUtf8(8804)),
       "-2.2)"
     ),
     "P(log(risk)>-3.4)",
     paste(
       "P(log(risk)",
-      as.character(expression("\u2264")),
+      paste(intToUtf8(8804)),
       "-3.4)"
     )
   ),
-  label_size = 10, vjust = 1.2, hjust = -0.1
+  label_size = 15, vjust = 1.8, hjust = -0.1
 )
+dev.off()
 
 ##### zoom plot ################################################################
 raster_input <- raster("tmp/result/excX_3_4.tif")
@@ -429,29 +480,61 @@ mean <- ggplot(validation) +
   geom_sf(aes(fill = mean_risk), color = NA) +
   scale_fill_viridis_c(option = "inferno") +
   labs(fill = "Mean of \n log risk") +
-  ggsave("tmp/result/coromap_agg_risk.png")
+  ggsave("tmp/coromap_aggrisk.pdf",
+    width = 1920 / 72 / 3, height = 1080 / 72 / 3,
+    dpi = 72, limitsize = F
+  )
 
+pal <- rainbow(80)
 odp_per_pop <- ggplot(validation) +
   geom_sf(aes(fill = ODP_per_pop), color = NA) +
-  scale_fill_viridis_c(option = "inferno") +
-  labs(labs = "ODP per \n population")
+  scale_fill_gradientn(colours = pal) +
+  labs(fill = "ODP \n per \n pop") +
+  theme(legend.position = "bottom", legend.direction = "vertical") +
+  theme(legend.title = element_text(angle = -90, size = 10)) +
+  guides(fill = guide_colourbar(label.position = "left"))
 
 plot_gg(odp_per_pop,
   multicore = TRUE, width = 5, height = 5, scale = 250, windowsize = c(1400, 866),
   zoom = 0.55, phi = 30
 )
 render_snapshot()
+save_obj("tmp/odp_per_plot")
 
 pdp_per_pop <- ggplot(validation) +
   geom_sf(aes(fill = PDP_per_pop), color = NA) +
-  scale_fill_viridis_c(option = "inferno") +
-  labs(fill = "PDP per \n population")
+  labs(fill = "PDP per \n pop") +
+  scale_fill_distiller(
+    palette = "PiYG",
+    limits = c(
+      0.000162,
+      max(validation$PDP_per_pop)
+    )
+  ) +
+  guides(fill = guide_colourbar(title.position = "bottom"))
 
 plot_gg(pdp_per_pop,
   multicore = TRUE, width = 5, height = 5, scale = 250, windowsize = c(1400, 866),
   zoom = 0.55, phi = 30
 )
 render_snapshot()
+save_obj("tmp/pdp_per_plot")
+
+pop <- ggplot(validation) +
+  geom_sf(aes(fill = population), color = NA) +
+  labs(fill = "Population") +
+  scale_fill_gradientn(colours = pal) +
+  theme(legend.direction = "vertical") +
+  theme(legend.title = element_text(angle = -270, size = 10)) +
+  scale_y_reverse() +
+  guides(fill = guide_colourbar(barheight = 10))
+
+plot_gg(pop,
+  multicore = TRUE, width = 5, height = 5, scale = 250, windowsize = c(1400, 866),
+  zoom = 0.55, phi = 30
+)
+render_snapshot()
+
 
 odp <- ggplot(validation) +
   geom_sf(aes(fill = as.numeric(ODP)), color = NA) +
@@ -492,13 +575,16 @@ correlation <- input %>%
     use = "complete.obs"
   ))
 
-wil <- map_dbl(wilcox, ~.$p.value)
+wil <- map_dbl(wilcox, ~ .$p.value)
 correlation <- unlist(correlation)
 val_concept <- data.frame(wilcox = wil, corr = correlation)
-names(val_concept) <- c( "Wilcoxon test p-value",
-                        "Spearman rank correlation")
+names(val_concept) <- c(
+  "Wilcoxon test p-value",
+  "Spearman rank correlation"
+)
 print(xtable(val_concept, type = "latex", digits = 3),
-      file = "tmp/validation.tex")
+  file = "tmp/validation.tex"
+)
 
 ##### eps for publication ######################################################
 convert.g(
@@ -506,6 +592,6 @@ convert.g(
   to = "eps", create.path = TRUE, options = NULL
 )
 convert.g(
-  path = "tmp\result", fileroot = "*", from = "png",
+  path = "tmp/result", fileroot = "*", from = "png",
   to = "eps", create.path = TRUE, options = NULL
 )

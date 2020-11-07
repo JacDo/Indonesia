@@ -63,7 +63,8 @@ model <- allModelsList %>%
 
 result <- cbind(
   map_chr(allModelsList, ~ paste(.x)[3]),
-  map_dbl(model, ~sum(log(.$cpo$cpo)))
+  map_dbl(model, ~sum(log(.$cpo$cpo))),
+  map_dbl(model, ~.$waic$waic)
 )
 komolgorov <- map_dbl(model[1:2], ~ ks.test(.$cpo$pit, "punif", 0,
                          1)$p.value)

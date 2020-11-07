@@ -5,6 +5,7 @@
 ###### set-up ##################################################################
 
 library(tidyverse)
+library(scales)
 library(igraph)
 library(circlize)
 library(MASS)
@@ -29,7 +30,7 @@ airports <- read.csv("airport_list.csv") # geolocation of airports
 indonesia <- data %>%
   filter(departure.iata %in% airports$iata_code) %>%
   group_by(arrival.iata, departure.iata) %>%
-  dplyr::summarise(n = n())
+  dplyr::summarise(n_flight = n())
 
 # merge location information about lon/lat
 
@@ -93,8 +94,8 @@ indonesia <- indonesia %>%
 indonesia <- indonesia %>%
   dplyr::group_by(departure.iata) %>%
   dplyr::mutate(
-    sum_departure = sum(n), # number of total flight connections
-    proportion_departure = n / sum_departure, # proportion of flight going
+    sum_departure = sum(n_flight), # number of total flight connections
+    proportion_departure = n_flight / sum_departure, # proportion of flight going
     # to each airport
     risk = proportion_departure * weight_dep + ifelse(is.na(weight_arr),
       0, weight_arr
@@ -107,60 +108,67 @@ indonesia <- indonesia %>%
 
 ##### visualize flight connection ##############################################
 indonesia_ig <- indonesia %>%
-  dplyr::select(departure.iata, arrival.iata, n)
+  dplyr::select(departure.iata, arrival.iata, n_flight)
 names(indonesia_ig) <- c("from", "to", "weight")
 
-circos.clear()
-freqpairs <- indonesia_ig
+indonesia_dir <- indonesia_ig %>%
+  group_by(ID1 = pmin(from, to), ID2 = pmax(from, to)) %>%
+  summarise(Count = sum(weight))
+names(indonesia_dir) <- c("from", "to", "weight")
 
-set.seed(234534256)
+pdf(
+  file = "coromap_network.pdf",
+  width = 4,
+  height = 4
+)
+circos.clear()
+freqpairs <- indonesia_dir
+
+set.seed(7854)
 
 col <- colorRamp2(
-  seq(min(indonesia_ig$weight),
-    max(indonesia_ig$weight),
-    length = nrow(indonesia_ig)
+  seq(min(indonesia_dir$weight),
+    max(indonesia_dir$weight),
+    length = nrow(indonesia_dir)
   ),
   rainbow(438)
 )
 
 circos.par(
   cell.padding = c(0, 0, 0, 0),
-  gap.degree = 2
+  gap.degree = 2.6
 )
 
 chordDiagram(freqpairs,
   annotationTrack = "grid",
   preAllocateTracks = list(
-    track.height = 0.1, col = col,
-    link.lwd = 2, link.lty = 2
+    track.height = 0.2, col = col,
+    link.lwd = 1, link.lty = 1, transparency = 0
   )
 )
 
-circos.trackPlotRegion(track.index = 1, panel.fun = function(x, y) {
-  xlim <- get.cell.meta.data("xlim")
-  xplot <- get.cell.meta.data("xplot")
-  ylim <- get.cell.meta.data("ylim")
-  sector.name <- get.cell.meta.data("sector.index")
-  if (abs(xplot[2] - xplot[1]) < 5) {
+circos.trackPlotRegion(
+  track.index = 1, panel.fun = function(x, y) {
+    xlim <- get.cell.meta.data("xlim")
+    xplot <- get.cell.meta.data("xplot")
+    ylim <- get.cell.meta.data("ylim")
+    sector.name <- get.cell.meta.data("sector.index")
     circos.text(mean(xlim), ylim[1], sector.name,
       facing = "clockwise",
-      niceFacing = TRUE, adj = c(0, 0.5), cex = 0.5
+      niceFacing = TRUE, adj = c(0, 0.1), cex = 0.5
     )
-  } else {
-    circos.text(mean(xlim), ylim[1], sector.name,
-      facing = "inside",
-      niceFacing = TRUE, adj = c(0.5, 0), cex = 0.6
-    )
-  }
-}, bg.border = NA)
+  },
+  bg.border = NA
+)
+dev.off()
 title("Domestic Flight Connections")
 ##### prediction ###############################################################
 ##### igraph input #############################################################
 
 gD <- simplify(graph.data.frame(indonesia_ig, directed = T))
-l <- layout_in_circle(gD)
+l <- layout_with_fr(gD)
 E(gD)$width <- E(gD)$weight / 200
-
+l <- layout_with_lgl(gD)
 plot(gD,
   layout = l,
   edge.arrow.size = 0.1,
@@ -240,12 +248,19 @@ ind_join <- data.frame(ind_join,
   dis = unlist(dist), sim = unlist(sim),
   con = unlist(connectivity), bw = edge_betweenness(gD, E(gD))
 )
+# scale vertex parameters
+ind_join <- ind_join %>%
+  mutate_at(vars(c(
+    "bet", "eig", "trans", "in_strength",
+    "out_strength"
+  )), rescale, to = c(0, 1))
 
 train <- ind_join %>% filter(!is.na(weight_dep))
 test <- ind_join %>% filter(is.na(weight_dep))
 
-model <- gam(log(risk) ~ bet + trans + in_strength + out_strength +
-  s(n) + s(con) +
+## Best model based on AIC
+model <- gam(log(risk) ~ bet + trans + in_strength + out_strength
+  + s(n_flight) + s(con) +
   s(proportion_departure), data = train)
 
 ##### diagnostics ##############################################################
@@ -254,7 +269,9 @@ texreg(model,
   caption = "General Additive Model",
   digits = 3, file = "gam_output.tex"
 )
+
 gam_diag <- getViz(model)
+
 ## gam_diagnostics: function to perform GAM smooths
 # @x index
 # @gam_diag getViz object for the model
@@ -272,8 +289,10 @@ gam_diagnostics <- function(x, gam_diag) {
 ##### plotting #################################################################
 plot_list <- lapply(c(1:3), function(x) gam_diagnostics(x, gam_diag))
 tmp <- lapply(plot_list, function(x) x$ggObj)
+
 grid.arrange(grobs = tmp, ncol = 2, nrow = 2)
-check(gam_diag,
+
+gam_plot <- check(gam_diag,
   a.qq = list(
     method = "tnorm",
     a.cipoly = list(fill = "light blue")
@@ -281,11 +300,12 @@ check(gam_diag,
   a.respoi = list(size = 0.5),
   a.hist = list(bins = 30)
 )
+
 ##### prediction ###############################################################
 test_data <- test %>%
   ungroup() %>%
   dplyr::select(
-    bet, eig, trans, in_strength, out_strength, n, dis, sim, con, bw,
+    bet, eig, trans, in_strength, out_strength, n_flight, dis, sim, con, bw,
     proportion_departure, distance_geo, weight_arr
   )
 
@@ -332,11 +352,21 @@ write.csv(final, "flight_risk.csv")
 
 ggplot(final, aes(reorder(iata, -risk_score), risk_score)) +
   geom_col() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8)) +
   xlab("Airports") +
   ylab("Risk") +
-  ggtitle("Airports by importation risk")
+  ggsave("tmp/coromap_flight_ranking.pdf",
+    width = 1920 / 72 / 3, height = 1080 / 72 / 3,
+    dpi = 72, limitsize = F
+  )
 
 ggplot(train) +
-  geom_histogram(aes(x = risk), bins = 20) +
-  ylab("Count")
+  geom_histogram(aes(x = log(risk)), bins = 15) +
+  ylab("Count") +
+  ggsave("tmp/coromap_airport_weight.pdf")
+
+p <- ggplot(train, aes(sample = log(risk)))
+p <- p +
+  stat_qq() +
+  stat_qq_line() +
+  ggsave("tmp/qq_risk.pdf")
