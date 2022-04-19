@@ -5,7 +5,7 @@ Our findings provide valuable insights for policy makers as they identify high-r
 ## Software
 The analysis was conducted in `R 4.0.2`. Some rasters also used additional functions from ArcMap 10.7.1
 ## Procedure to replicate results
-As the data files are very large, we share them in a separate file: https://www.dropbox.com/sh/ry5hom423kzf6fb/AABbC6RhRjwSk-6PONPu2ll6a?dl=0
+As the data files are very large, we share them in a separate folder: https://1drv.ms/u/s!AqvX7coFNpv_jpgRw9iib6MCyikatg?e=uwwVWu
 
 In order to replicate the results, use the following order:
 1. `coromap.flight.risk` (uses the webscraped data from https://aviationstack.com/): yields the predictions based on the GAM-network-approach
