@@ -14,7 +14,7 @@ library(scales)
 library(spdep)
 library(furrr)
 
-setwd("/home/cloud/data")
+setwd("/home/cloud")
 load("input.Rds")
 ##### scale point ##############################################################
 point_input$risk <- rescale(point_input$risk, c(0.01, 0.99))
@@ -50,7 +50,8 @@ validation_method <- function(spde, indexs, mesh, point_input, coo, i) {
         travel = train$travel_time,
         traffic = train$traffic_density,
         java = train$java,
-        java_dist = train$distancejava
+        java_dist = train$distancejava,
+        population = train$population
       )
     ),
     tag = "est"
@@ -68,7 +69,8 @@ validation_method <- function(spde, indexs, mesh, point_input, coo, i) {
         travel = test$travel_time,
         traffic = test$traffic_density,
         java = test$java,
-        java_dist = test$distancejava
+        java_dist = test$distancejava,
+        population = test$population
       )
     ),
     tag = "pred"
@@ -76,7 +78,7 @@ validation_method <- function(spde, indexs, mesh, point_input, coo, i) {
   # put them together
   stk.full <- inla.stack(stk.e, stk.p)
   formula <- as.formula(paste("log(y) ~ 0", "b0", "f(s, model = spde)",
-    "log(travel)", "log(traffic)", "java", "java_dist",
+    "log(travel)", "log(traffic)", "log(population)",
     sep = "+"
   ))
   mod.mode <- inla(formula,
@@ -107,8 +109,8 @@ validation_method <- function(spde, indexs, mesh, point_input, coo, i) {
 ##### apply validation #########################################################
 plan(multisession)
 validation_summary <- future_map_dfr(c(1:78), ~ validation_method(
-  spde = spde,
-  indexs = indexs,
+  spde = spde[[1]],
+  indexs = indexs[[1]],
   mesh = mesh,
   point_input = point_input,
   coo = coo, i = .x
@@ -117,25 +119,33 @@ validation_summary <- future_map_dfr(c(1:78), ~ validation_method(
 validation_new <- cbind(validation_summary, risk = log(point_input$risk))
 save.image("validation.Rds")
 ##### visualization ############################################################
-setwd("C:/Users/seufe/Dropbox/Unterlagen_Jacqueline/data")
-load("tmp/validation.Rds")
-validation_new <- cbind(validation_new, index = 1:78)
 
-ggplot(validation_new, aes(x = index, y = mean, color = "Prediction")) +
+load(here("ExtValidation", "data", "validation.Rds"))
+validation_new <- cbind(validation_new_gaussian, index = 1:78)
+
+ggplot(validation_new, aes(x = index, y = mean, color = "Mean predicted \n value")) +
   geom_point() +
-  geom_point(aes(x = index, y = risk, color = "True value")) +
+  geom_point(aes(x = index, y = risk, color = "Observed value")) +
   geom_errorbar(aes(
     ymin = quant0.025, ymax = quant0.975,
-    color = "0.025/\n0.975 CI"
+    color = paste("95% CI")
   ),
   width = .5, # Width of the error bars
   position = position_dodge(.9)
   ) +
-  ylab("Mean") +
-  xlab("Index") +
-  labs(color = "Colour") +
-  ggsave("tmp/coromap_validation.pdf",
-    width = 1920 / 72 / 3, height = 1080 / 72 / 3,
-    dpi = 72, limitsize = F
+  ylab("(log) RISK") +
+  xlab("Hold-out airport") +
+  labs(color = "Legend") +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 14), axis.title = element_text(size = 14),
+    legend.text = element_text(size = 14),
+    legend.title = element_text(size = 14),
+    legend.position = c(.12, .15),
+    legend.background = element_blank()
   )
-write.csv(validation_new, "tmp/validation.csv")
+ggsave(here("Extvalidation", "plots", "coromap_validation.pdf"),
+  width = 1920 / 72 / 3, height = 1080 / 72 / 3,
+  dpi = 600, limitsize = F
+)
+write.csv(validation_new, here("Extvalidation", "data", "coromap_validation.csv"))

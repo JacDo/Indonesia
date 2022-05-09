@@ -9,7 +9,8 @@ library(tidyverse)
 library(plyr)
 library(furrr)
 library(keyring)
-setwd("C:/Users/seufe/Dropbox/Unterlagen_Jacqueline/data/tmp")
+library(here)
+
 ##### credentials ##############################################################
 key_secret <- key_set("MY_SECRET")
 key <- key_get("MY_SECRET")
@@ -67,7 +68,7 @@ airports <- seq(0, upper, by = 100) %>%
     link = airport_link
   ))
 
-write.csv(airports, "airport_list.csv")
+write.csv(airports, here("GAM","data", "airport_list.csv"))
 
 ##### input parameters #########################################################
 # data has been scraped on multiple occasions and then stored in different
@@ -90,4 +91,4 @@ air_total <- future_map2_dfr(input$airport, input$date, ~ {
   )
 }, .progress = TRUE)
 
-write.csv(file = "coromap.flights_additional_3.csv", air_total)
+write.csv(file = here("GAM","data", "coromap.flights_additional_3.csv"), air_total)
