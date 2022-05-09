@@ -306,6 +306,8 @@ test <- ind_join %>% filter(is.na(weight_dep))
 ## Best model based on AIC
 options(scipen = 3)
 
+
+#####model selection############################################################
 formula_comp <- c(
   "log(risk) ~ bet + trans + in_strength + out_strength+
                s(con)+
@@ -376,7 +378,8 @@ summary_model <- data.frame(
 
 summary_model <- summary_model[c(2, 3, 1, 5, 6, 4, 8, 9, 7), ]
 prep_models <- function(data) {
-  regressors <- paste("s(", names(data)[c(3, 11, 13, 19, 20, 21)], ", bs='cs')", sep = "")
+  regressors <- paste("s(", names(data)[c(3, 11, 13, 19, 20, 21)], ", bs='cs')",
+                      sep = "")
   regressors <- c(regressors, paste(names(data)[c(14:18)], sep = ""))
   regressors <- c(regressors, paste(names(data)[c(3, 11, 13, 19, 20, 21)], sep = ""))
   regMat <- expand.grid(replicate(
@@ -434,7 +437,13 @@ models_selected <- models_selected %>%
 
 formula <- models_selected %>%
   pull(model)
+
+#####################cross-validation###########################################
 cross_validation <- function(train, formula, family = "gaussian") {
+  ## cross_validation: cross-validation of GAM
+  # @train: training data
+  # @gam_diag: formula
+  # @family: family to be specified
   family <- ifelse(family == "gaussian", "gaussian", "Gamma(link='log')")
   set.seed(4019)
   training.samples <- train$risk %>%
@@ -556,44 +565,6 @@ result_cv <- result_cv %>% arrange(RMSE)
 print(xtable(result_cv, type = "latex", digits = 2),
   file = here("GAM", "tables", "rmse_mae_gam.tex")
 )
-
-# texreg(models_list[c(3, 1)], digit = 2)
-# summary(models_list[[2]])
-# texreg(models_list[c(6, 4)], digit = 2)
-# summary(models_list[[5]])
-# texreg(models_list[c(9, 7)], digit = 2)
-# summary(models_list[[8]])
-
-# model <- models_list[[4]]
-# p <- predict(model, train, type = "link", se.fit = TRUE)
-# upr <- p$fit + (2 * p$se.fit)
-# lwr <- p$fit - (2 * p$se.fit)
-#
-# p <- data.frame(p)
-# p$index <- 1:132
-#
-# ggplot(p, aes(x = index, y = fit, color = "Mean predicted \n value")) +
-#   geom_point() +
-#   geom_point(aes(x = index, y = log(train$risk), color = "Observed value")) +
-#   geom_errorbar(aes(
-#     ymin = lwr, ymax = upr,
-#     color = paste("95% CI")
-#   ),
-#   width = .5, # Width of the error bars
-#   position = position_dodge(.9)
-#   ) +
-#   ylab("(log) RISK") +
-#   xlab("Flight connection") +
-#   labs(color = "Legend") +
-#   theme_bw() +
-#   theme(
-#     axis.text = element_text(size = 14), axis.title = element_text(size = 14),
-#     legend.text = element_text(size = 14),
-#     legend.title = element_text(size = 14),
-#     legend.position = "bottom",
-#     legend.background = element_blank()
-#   ) +
-#   ggsave("coromap_validation_flight_connection.pdf")
 
 
 gam_diag <- getViz(model)
@@ -810,23 +781,3 @@ final <- final %>%
 
 write.csv(final, here("GAM", "data", "flight_risk.csv"))
 
-# ggplot(final, aes(reorder(iata, -risk_score), risk_score)) +
-#   geom_col() +
-#   theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8)) +
-#   xlab("Airports") +
-#   ylab("Risk") +
-#   ggsave("tmp/coromap_flight_ranking.pdf",
-#     width = 1920 / 72 / 3, height = 1080 / 72 / 3,
-#     dpi = 72, limitsize = F
-#   )
-
-# ggplot(train) +
-#   geom_histogram(aes(x = risk), bins = 15) +
-#   ylab("Count") +
-#   ggsave("tmp/coromap_airport_weight.pdf")
-#
-# p <- ggplot(train, aes(sample = log(risk)))
-# p <- p +
-#   stat_qq() +
-#   stat_qq_line() +
-#   ggsave("tmp/qq_risk.pdf")
