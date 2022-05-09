@@ -5,7 +5,7 @@ Our findings provide valuable insights for policy makers as they identify high-r
 ## Software
 The analysis was conducted in `R 4.0.2`. Some rasters also used additional functions from ArcMap 10.7.1
 ## Procedure to replicate results
-As the data files are very large, we share them in a separate folder: https://1drv.ms/u/s!AqvX7coFNpv_jpgRw9iib6MCyikatg?e=uwwVWu
+As the data files are very large and only partly available to the public, we share them in a separate folder: https://1drv.ms/u/s!AqvX7coFNpv_jqY1nomY_febsSgVFQ?e=FGY3IJ
 
 In order to replicate the results, use the following order:
 1. `coromap.flight.risk` (uses the webscraped data from https://aviationstack.com/): yields the predictions based on the GAM-network-approach
@@ -18,7 +18,7 @@ In order to replicate the results, use the following order:
     Use GAM on training and testing set
 1. `coromap.traveldist.indo`: cleans and prepares rasters as covariates
     1. travel time: Distance to nearest airport, interpolate missing islands
-    1. java: Dummy for location on Java/Bali
+    1. population: GHS data for Indonesia
     1. distance to  Java/Bali: Euclidean distance to the respective islands
     1. traffic density: Obtained from ArcMap
 1. `coromap.model_input`: prepares the data for the INLA 
@@ -41,4 +41,6 @@ Be sure to execute the files in the right order as they build up on each other.
 In addition, keep those to files at hand:
 1. `impute_function`: Impute missing raster values based on the next closest raster pixel
 1. `inla_function`: A simple copy-and-paste of useful discontinued functions (INLA, INLAutils)
+1. `coromap.clean_file_name`: Make names of files consistent
+1. `loocv_function`: a modified version from the LOOCV-function for GAM (originally taken from SardineForest)
 
